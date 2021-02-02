@@ -3,29 +3,32 @@
 #include <WiFi.h>
 #include "sensors/dht22.h"
 #include "sensors/mhz19b.h"
+#include "leds/ws2812b.h"
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
 const char* ssid = "";
 const char* password = "";
-char* wifiHostName = "";
+const char* wifiHostName = "";
 
 const char* mqtt_server = "joel-telegraf";
 
 WiFiClient espClient;
 Dht22 dht22;
-Mhz19b mhz19;
+Mhz19b mhz19b;
+WS2812b ws2812b;
 PubSubClient client(espClient);
 
 void setup() {
-  # Begin serial and setup sensors
+  // Begin serial and setup sensors
   Serial.begin(115200);
   dht22.setup();
-  mhz19.setup();
+  mhz19b.setup();
+  ws2812b.setup();
 
   delay(10);
 
-  # Setup wifi connection
+  // Setup wifi connection
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.mode(WIFI_STA);
@@ -38,7 +41,7 @@ void setup() {
   Serial.println("WiFi connected");
   Serial.println(WiFi.localIP());
 
-  # Setup mqtt connection
+  // Setup mqtt connection
   client.setServer(mqtt_server, 1883);
 
   delay(10000);
@@ -70,12 +73,12 @@ void loop() {
 
   float h = dht22.readHumidity();
   float t = dht22.readTemperature();
-  int co2 = mhz19.readCO2();
+  int co2 = mhz19b.readCO2();
 
   if (dht22.verify(t) || dht22.verify(h)) {
     Serial.println("Failed to read from DHT sensor!");
   }
-  else if(mhz19.verify()) {
+  else if(mhz19b.verify()) {
     Serial.println("Failed to read from MHZ19 sensor!"); 
   }
   else {
@@ -88,6 +91,10 @@ void loop() {
   
     String json_value;
     serializeJson(jsonDocument, json_value);
+
+    if(co2 >= 1000) {
+      ws2812b.loop();
+    }
   
     char mqtt_value[200];
     json_value.toCharArray(mqtt_value, 200);
